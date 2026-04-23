@@ -14,7 +14,7 @@
   - `XX`: 每个 message 对应的写对象，用于编码
   - `${method}Context__rename.cs`: 为每个 method 生成一个 Context 对象。
     - `__rename` 后缀说明：应该在这个文件里填写具体的业务逻辑，之后对文件重新命名
-  - `${service}.cs`: 为整个 service 生成 kestrel 框架的回调
+  - `${service}__rename.cs`: 为整个 service 生成 kestrel 框架的回调
     - kestrel 框架中要使用这个类的静态成员来进行注册：
 
     ```csharp
