@@ -37,7 +37,7 @@ class LoginContext : ContextBase, QiWa.Common.IResettable
             //
             L!.Info(
                 // 这里把请求流水写到日志
-                Field.RawJson("request"u8, buf.AsSpan())
+                Field.Utf8String("request"u8, buf.AsSpan())
             );
             //
             j = Encoding.UTF8.GetString(buf.AsSpan());

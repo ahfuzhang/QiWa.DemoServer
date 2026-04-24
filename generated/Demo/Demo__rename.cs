@@ -117,6 +117,7 @@ public class Demo  // 这里是 service 的名字
                     LoginContext ctx = LoginContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
+                        // ctx.Reset();
                         LoginContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });
@@ -216,6 +217,7 @@ public class Demo  // 这里是 service 的名字
                     GetUserInfoContext ctx = GetUserInfoContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
+                        // ctx.Reset();
                         GetUserInfoContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });
@@ -315,6 +317,7 @@ public class Demo  // 这里是 service 的名字
                     SetUserTagsContext ctx = SetUserTagsContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
+                        // ctx.Reset();
                         SetUserTagsContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });

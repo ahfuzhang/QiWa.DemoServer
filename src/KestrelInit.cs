@@ -53,6 +53,7 @@ internal static class KestrelInit
                 kestrelOptions.ListenAnyIP(
                     http2Port.Value,
                     listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
+                kestrelOptions.Limits.Http2.MaxStreamsPerConnection = 200;
             }
 
             // gRPC 端口（可选，gRPC 基于 HTTP/2）
@@ -181,7 +182,9 @@ internal static class KestrelInit
         //     //app.MapGrpcService<EchoService>().RequireHost($"*:{grpcPort.Value}");
         // }
 
-        app.MapFallback(callback);
+        // MapFallback(Delegate) 在 AOT 下会触发 IL2026/IL3050/RDG002。
+        // 改用 RequestDelegate 中间件：路由已匹配时继续，否则交给 callback 兜底。
+        app.Use(next => ctx => ctx.GetEndpoint() != null ? next(ctx) : callback(ctx));
 
         return app;
     }

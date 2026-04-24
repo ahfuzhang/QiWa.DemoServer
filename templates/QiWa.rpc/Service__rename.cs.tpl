@@ -96,6 +96,7 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                     {{.MethodName}}Context ctx = {{.MethodName}}ContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
+                        // ctx.Reset();
                         {{.MethodName}}ContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });

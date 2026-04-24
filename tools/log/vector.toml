@@ -1,0 +1,96 @@
+# vector.toml
+
+# 1) Source: 从标准输入读取（你把别的进程 stdout pipe 进来）
+#    例： your_app 2>&1 | vector -c vector.toml
+[sources.stdin]
+type = "stdin"
+
+# 可选：指定编码/行分隔等（一般不需要）
+# encoding.charset = "utf-8"
+
+# 2) Transform: 把整行内容放到 .message（可选，但很常用）
+[transforms.parse]
+type = "remap"
+inputs = ["stdin"]
+source = '''
+log_json,err = parse_json(.message)
+if err != null {
+	abort
+}
+. = log_json
+
+if !exists(.Message) {
+    .Message = " "
+}
+'''
+
+# source = '''
+# .message = string!(.message ?? .)
+# '''
+
+# 3) Sink: 输出到 stdout（调试最方便）
+# [sinks.out]
+# type = "console"
+# inputs = ["to_message"]
+# encoding.codec = "json"
+
+# [sources.my_logs]
+# type = "file"
+# include = ["/data/*.log"]
+# read_from = "beginning"
+#ignore_no_files = false
+#close_when_done = true
+
+# [transforms.parse]
+# type = "remap"
+# inputs = ["my_logs"]
+# source = '''
+# log_json,err = parse_json(.message)
+# if err != null {
+# 	abort
+# }
+# if !is_object(log_json){
+# 	abort
+# }
+
+# log_json = object!(log_json)
+# . |= log_json
+# ._msg = " "
+# del(.message)
+
+# decoded,err = parse_query_string(.http_request_query_string)
+# if err==null {
+# 	# 解码成功
+# 	.querystring = decoded
+# 	del(.http_request_query_string)
+# }
+
+# .client_ip = to_string(.client_ip) ?? ""
+# if is_ipv4(.client_ip) {
+# 	.client_ipv4 = .client_ip
+# 	del(.client_ip)
+# } else if is_ipv6(.client_ip){
+# 	.client_ipv6 = .client_ip
+# 	del(.client_ip)
+# }
+
+# if exists(.file1) {
+# 	.l, err = length(.file1)
+# 	if err == null {
+# 		.l_success = .file1
+# 	} else {
+# 		.l_error = .file1
+# 	}
+# }
+
+# '''
+
+[sinks.jsonline_http]
+type = "http"
+inputs = ["parse"]
+uri = "http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp&_msg_field=Properties.Message&_stream_fields=Level&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields="
+method = "post"
+encoding.codec = "json"
+request.retry_attempts = 0
+request.compression = "zstd"
+framing.method = "newline_delimited"
