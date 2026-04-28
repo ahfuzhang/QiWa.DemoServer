@@ -6,7 +6,7 @@ build:
 
 run:
 	dotnet run --project $(PRJ).csproj -- \
-	  -http1.addr=http://127.0.0.1:8091/Demo/Login \
+	  -http1.addr=http://127.0.0.1:8091/api/v1/login \
 	  -thread.count=8 \
 	  -connection.per.thread=30 \
 	  -task.per.connection=1 \
@@ -26,7 +26,7 @@ run_http1_pb:
 
 run_h2:
 	dotnet run --project $(PRJ).csproj -- \
-	  -http2.addr=http://127.0.0.1:8092/Demo/Login \
+	  -http2.addr=http://127.0.0.1:8092/api/v1/login \
 	  -thread.count=8 \
 	  -connection.per.thread=2 \
 	  -task.per.connection=10 \

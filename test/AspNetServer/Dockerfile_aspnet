@@ -1,0 +1,8 @@
+#FROM harbor.sige.la/microsoft/dotnet/aspnet:6.0
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /app
+
+COPY ./bin/Release/net10.0/linux-x64/* /app
+
+ENTRYPOINT ["/app/AspNetServer"]
