@@ -14,8 +14,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="QiWa.Common" Version="*" />
-    <PackageReference Include="QiWa.framework" Version="*" />
+    <PackageReference Include="QiWa.Common" Version="0.1.6" />
+    <PackageReference Include="QiWa.framework" Version="0.2.4" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
   </ItemGroup>
 
 </Project>

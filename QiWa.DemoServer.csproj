@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Remove="generated/**/*.cs" />
     <Compile Remove="tools/**/*.cs" />
+    <Compile Remove="test/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,9 +22,10 @@
 
   <ItemGroup>
     <PackageReference Include="QiWa.Common" Version="0.1.6" />
-    <PackageReference Include="QiWa.framework" Version="0.2.3" />
+    <PackageReference Include="QiWa.framework" Version="0.2.4" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="OpenTelemetry" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-beta.1" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />

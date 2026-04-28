@@ -7,20 +7,34 @@ using Microsoft.Extensions.ObjectPool;
 using QiWa.Common;
 using QiWa.ConsoleLogger;
 using QiWa.KestrelWrap;
+using QiWa.Metrics;
 
-public class DemoCounters : QiWa.Common.IResettable
+public class DemoCounters : QiWa.Metrics.MetricsBase, QiWa.Common.IResettable
 {
+
+    [PrometheusMetric("http_request_total", "service=\"Demo\",method=\"Login\"")]
     public UInt64 LoginRequestTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"Login\",error_type=\"decode\"")]
     public UInt64 LoginDecodeErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"Login\",error_type=\"exception\"")]
     public UInt64 LoginExceptionsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"Login\",error_type=\"logic error\"")]
     public UInt64 LoginLogicErrorsTotal;
+    [PrometheusMetric("http_request_total", "service=\"Demo\",method=\"GetUserInfo\"")]
     public UInt64 GetUserInfoRequestTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"decode\"")]
     public UInt64 GetUserInfoDecodeErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"exception\"")]
     public UInt64 GetUserInfoExceptionsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"logic error\"")]
     public UInt64 GetUserInfoLogicErrorsTotal;
+    [PrometheusMetric("http_request_total", "service=\"Demo\",method=\"SetUserTags\"")]
     public UInt64 SetUserTagsRequestTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"decode\"")]
     public UInt64 SetUserTagsDecodeErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"exception\"")]
     public UInt64 SetUserTagsExceptionsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"logic error\"")]
     public UInt64 SetUserTagsLogicErrorsTotal;
 
     public void Reset()
@@ -117,7 +131,6 @@ public class Demo  // 这里是 service 的名字
                     LoginContext ctx = LoginContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
-                        // ctx.Reset();
                         LoginContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });
@@ -140,8 +153,8 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
-                    byte[]? reqRequest;
-                    (reqRequest, err) = await ctx.ReadRequest().ConfigureAwait(true);
+                    // read http post body
+                    err = await ctx.ReadRequest().ConfigureAwait(true);
                     if (err.Err())
                     {
                         // 打日志
@@ -153,6 +166,20 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
+                    // 解压缩
+                    byte[]? reqRequest;
+                    (reqRequest, err) = ctx.Decompress();
+                    if (err.Err())
+                    {
+                        // 打日志
+                        ctx.L!.Warn(
+                            Field.Int64("error_code"u8, err.Code),
+                            Field.String("message"u8, err.Message)
+                        );
+                        // 数据上报
+                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        return;
+                    }                    
                     // 解码
                     err = ctx.Decode<ReadonlyLoginRequest>(reqRequest!, ref ctx.Request);
                     if (err.Err())
@@ -217,7 +244,6 @@ public class Demo  // 这里是 service 的名字
                     GetUserInfoContext ctx = GetUserInfoContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
-                        // ctx.Reset();
                         GetUserInfoContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });
@@ -240,8 +266,8 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
-                    byte[]? reqRequest;
-                    (reqRequest, err) = await ctx.ReadRequest().ConfigureAwait(true);
+                    // read http post body
+                    err = await ctx.ReadRequest().ConfigureAwait(true);
                     if (err.Err())
                     {
                         // 打日志
@@ -253,6 +279,20 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
+                    // 解压缩
+                    byte[]? reqRequest;
+                    (reqRequest, err) = ctx.Decompress();
+                    if (err.Err())
+                    {
+                        // 打日志
+                        ctx.L!.Warn(
+                            Field.Int64("error_code"u8, err.Code),
+                            Field.String("message"u8, err.Message)
+                        );
+                        // 数据上报
+                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        return;
+                    }                    
                     // 解码
                     err = ctx.Decode<ReadonlyGetUserInfoRequest>(reqRequest!, ref ctx.Request);
                     if (err.Err())
@@ -317,7 +357,6 @@ public class Demo  // 这里是 service 的名字
                     SetUserTagsContext ctx = SetUserTagsContextPool.Get();
                     using var _ = new QiWa.Helper.ScopeGuard(() =>
                     {
-                        // ctx.Reset();
                         SetUserTagsContextPool.Return(ctx);
                         //todo: 上报处理时间
                     });
@@ -340,8 +379,8 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
-                    byte[]? reqRequest;
-                    (reqRequest, err) = await ctx.ReadRequest().ConfigureAwait(true);
+                    // read http post body
+                    err = await ctx.ReadRequest().ConfigureAwait(true);
                     if (err.Err())
                     {
                         // 打日志
@@ -353,6 +392,20 @@ public class Demo  // 这里是 service 的名字
                         Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
                         return;
                     }
+                    // 解压缩
+                    byte[]? reqRequest;
+                    (reqRequest, err) = ctx.Decompress();
+                    if (err.Err())
+                    {
+                        // 打日志
+                        ctx.L!.Warn(
+                            Field.Int64("error_code"u8, err.Code),
+                            Field.String("message"u8, err.Message)
+                        );
+                        // 数据上报
+                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        return;
+                    }                    
                     // 解码
                     err = ctx.Decode<ReadonlySetUserTagsRequest>(reqRequest!, ref ctx.Request);
                     if (err.Err())

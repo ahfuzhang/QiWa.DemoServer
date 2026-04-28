@@ -31,7 +31,7 @@
 
 * `make QiWa.rpc`
   - 根据 proto 文件，生成 rpc 服务器的基础代码
-  - 注意，需要先安装工具：`go install github.com/ahfuzhang/BaoHuLu/cmd/hulu@v0.3.0`
+  - 注意，需要先安装工具：`go install github.com/ahfuzhang/BaoHuLu/cmd/hulu@v0.4.1`
 * `make build`
   - 编译项目
 * `make run`

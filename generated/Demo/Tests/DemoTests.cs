@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using QiWa.Common;
 using Xunit;
@@ -379,6 +380,36 @@ public class LoginRequestTests
         Assert.True(r.FromProtobuf(bad).Err());
     }
 
+    // Serialises a populated LoginRequest, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleLoginRequest();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlyLoginRequest();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
+    }
+
     // ── FromJSON error cases ──────────────────────────────────────────────────
 
     [Fact]
@@ -652,6 +683,36 @@ public class LoginResponseTests
         Assert.True(r.FromProtobuf(bad).Err());
     }
 
+    // Serialises a populated LoginResponse, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleLoginResponse();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlyLoginResponse();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
+    }
+
     // ── FromJSON error cases ──────────────────────────────────────────────────
 
     [Fact]
@@ -920,6 +981,36 @@ public class GetUserInfoRequestTests
         var bad = new byte[] { 0xA2, 0x06, 0x64 };
         var r = new ReadonlyGetUserInfoRequest();
         Assert.True(r.FromProtobuf(bad).Err());
+    }
+
+    // Serialises a populated GetUserInfoRequest, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleGetUserInfoRequest();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlyGetUserInfoRequest();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
     }
 
     // ── FromJSON error cases ──────────────────────────────────────────────────
@@ -1196,6 +1287,36 @@ public class GetUserInfoResponseTests
         Assert.True(r.FromProtobuf(bad).Err());
     }
 
+    // Serialises a populated GetUserInfoResponse, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleGetUserInfoResponse();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlyGetUserInfoResponse();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
+    }
+
     // ── FromJSON error cases ──────────────────────────────────────────────────
 
     [Fact]
@@ -1465,6 +1586,36 @@ public class SetUserTagsRequestTests
         var bad = new byte[] { 0xA2, 0x06, 0x64 };
         var r = new ReadonlySetUserTagsRequest();
         Assert.True(r.FromProtobuf(bad).Err());
+    }
+
+    // Serialises a populated SetUserTagsRequest, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleSetUserTagsRequest();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlySetUserTagsRequest();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
     }
 
     // ── FromJSON error cases ──────────────────────────────────────────────────
@@ -1737,6 +1888,36 @@ public class SetUserTagsResponseTests
         Assert.True(r.FromProtobuf(bad).Err());
     }
 
+    // Serialises a populated SetUserTagsResponse, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleSetUserTagsResponse();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlySetUserTagsResponse();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
+    }
+
     // ── FromJSON error cases ──────────────────────────────────────────────────
 
     [Fact]
@@ -2007,6 +2188,36 @@ public class UserTests
         var bad = new byte[] { 0xA2, 0x06, 0x64 };
         var r = new ReadonlyUser();
         Assert.True(r.FromProtobuf(bad).Err());
+    }
+
+    // Serialises a populated User, then appends unknown fields of every
+    // wire type that a proto3 parser must be able to skip.  Covers the
+    // skip-unknown-field branches for all four live wire types:
+    //   wire 0 (varint)    – field 100: tag [0xA0,0x06], value 1    → [0x01]
+    //   wire 1 (64-bit)    – field 101: tag [0xA9,0x06]             + 8 bytes
+    //   wire 2 (len-delim) – field 102: tag [0xB2,0x06], length 3   + "abc"
+    //   wire 5 (32-bit)    – field 103: tag [0xBD,0x06]             + 4 bytes
+    [Fact]
+    public void FromProtobuf_UnknownTrailingFields_AllWireTypes_Ignored()
+    {
+        var w = MakeSampleUser();
+        var buf = new RentedBuffer(w.ProtobufSize() + 4);
+        w.ToProtobuf(ref buf);
+        var valid = buf.AsSpan().ToArray();
+        buf.Dispose();
+
+        var cases = new[]
+        {
+            valid.Concat(new byte[] { 0xA0, 0x06, 0x01 }).ToArray(),                                             // wire 0: varint
+            valid.Concat(new byte[] { 0xA9, 0x06, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08 }).ToArray(), // wire 1: 64-bit
+            valid.Concat(new byte[] { 0xB2, 0x06, 0x03, 0x61, 0x62, 0x63 }).ToArray(),                          // wire 2: len-delim
+            valid.Concat(new byte[] { 0xBD, 0x06, 0x01, 0x02, 0x03, 0x04 }).ToArray(),                          // wire 5: 32-bit
+        };
+        foreach (var data in cases)
+        {
+            var r = new ReadonlyUser();
+            Assert.False(r.FromProtobuf(data).Err());
+        }
     }
 
     // ── FromJSON error cases ──────────────────────────────────────────────────
