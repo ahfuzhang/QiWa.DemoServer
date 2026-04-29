@@ -57,7 +57,15 @@ public class LoginController : ControllerBase
             // todo: 去掉日志库后，再对比性能
             // todo: 对 内部原理进行说明
             // todo: 做日志库的性能对比
-            WriteAccessLog(reqJson);
+
+            var r = HttpContext.Request;
+            if (r.Query.TryGetValue("log_output_mode", out var logOutputMode))
+            {
+                if (logOutputMode=="console_writeline")
+                {
+                    WriteAccessLog(reqJson);
+                }
+            }
 
             var rsp = new LoginResponse
             {
@@ -128,9 +136,11 @@ class Program
             else if (arg.StartsWith("-cores="))
                 cores = int.Parse(arg["-cores=".Length..]);
         }
-        ThreadPool.SetMinThreads(cores, cores);
-        ThreadPool.SetMaxThreads(cores, cores);
-
+        if (cores>0)
+        {
+            ThreadPool.SetMinThreads(cores, cores);
+            ThreadPool.SetMaxThreads(cores, cores);
+        }
         var builder = WebApplication.CreateBuilder([]);
 
         builder.WebHost.ConfigureKestrel(serverOptions =>
