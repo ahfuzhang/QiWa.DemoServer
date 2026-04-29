@@ -26,6 +26,7 @@ class Program
     static string s_compress = "";
     static string s_encodeType = "json";
     static int s_stressTestSeconds = 10;
+    static string s_queryString = "";
 
     // bucket[0]=[0,100μs)  bucket[i]=[100*1.5^(i-1), 100*1.5^i) for i>=1
     const int NumBuckets = 40;
@@ -159,7 +160,8 @@ class Program
         {
             try
             {
-                var req = new HttpRequestMessage(HttpMethod.Post, addr)
+                var url = string.IsNullOrEmpty(s_queryString) ? addr : addr + "?" + s_queryString;
+                var req = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Version = client.DefaultRequestVersion,
                     VersionPolicy = client.DefaultVersionPolicy,
@@ -373,6 +375,7 @@ class Program
                 case "compress": s_compress = kv[1]; break;
                 case "encode.type": s_encodeType = kv[1]; break;
                 case "stress.test.seconds": int.TryParse(kv[1], out s_stressTestSeconds); break;
+                case "query.string": s_queryString = kv[1]; break;
             }
         }
     }
@@ -396,6 +399,8 @@ class Program
         Console.WriteLine($"Received (raw)  : {FormatBytes(s_totalBytesReceived)}  ({FormatBytes(s_totalBytesReceived / sec)}/s)");
         if (!string.IsNullOrEmpty(s_compress))
             Console.WriteLine($"Recv (decomp)   : {FormatBytes(s_totalDecompressedBytesReceived)}  ({FormatBytes(s_totalDecompressedBytesReceived / sec)}/s)");
+        Console.WriteLine($"Avg bytes/req   : {FormatBytes(total > 0 ? s_totalBytesSent / total : 0)}");
+        Console.WriteLine($"Avg bytes/resp  : {FormatBytes(total > 0 ? s_totalBytesReceived / total : 0)}");
 
         Console.WriteLine();
         Console.WriteLine("Latency distribution:");

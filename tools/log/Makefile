@@ -35,3 +35,21 @@ vlogs:
   -H 'Content-Type: application/stream+json' \
   --data-binary $'{"Timestamp":"2026-04-24T14:30:00+08:00","Level":"Information","Properties":{"Message":"hello VictoriaLogs from curl"},"TraceId":"abc-001","UserId":123}\n{"Timestamp":"2026-04-24T14:30:01+08:00","Level":"Error","Properties":{"Message":"something failed"},"TraceId":"abc-002","Exception":"demo exception"}\n'
 
+vlogs_ms_log:
+	# todo: modify time
+	curl -X POST \
+  'http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp&_msg_field=Properties.Message&_stream_fields=Level&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields=' \
+  -H 'Content-Type: application/stream+json' \
+  --data-binary $'{"Timestamp":"2026-04-29 05:28:45.947 ","EventId":0,"LogLevel":"Information","Category":"ms_logger","Message":"","State":{"{OriginalFormat}":""},"Scopes":[{"Message":"System.Collections.Generic.Dictionary\u00602[System.String,System.Object]","request":"{\u0022user_name\u0022:\u0022ahfu console_writeline\u0022}","path":"/api/v1/login","method":"POST","protocol":"HTTP/2","client_ip":"::ffff:127.0.0.1","_file":"/home/ahfu/code/github.com/ahfuzhang/QiWa.DemoServer/generated/Demo/Demo.LoginContext__.cs","_line":133,"_func":"Run","_time":"2026-04-29T05:28:45.9471927Z"}]}\n'
+
+vlogs_ms_log_file:
+	curl -X POST \
+  'http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp&_msg_field=Properties.Message&_stream_fields=Level&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields=' \
+  -H 'Content-Type: application/stream+json' \
+  --data @ms_log.json -v
+
+vlogs_serlog_file:
+	curl -X POST \
+  'http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp&_msg_field=Properties.Message&_stream_fields=Level,client_ip&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields=' \
+  -H 'Content-Type: application/stream+json' \
+  --data @serlog.json -v

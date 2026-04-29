@@ -4,15 +4,18 @@ BUILD_DIR=../../build/StressTest/
 build:
 	dotnet build $(PRJ).csproj
 
+log_mode=
+# make run log_mode=console_writeline
 run:
 	dotnet run --project $(PRJ).csproj -- \
 	  -http1.addr=http://127.0.0.1:8091/api/v1/login \
+	  -query.string=log_output_mode=$(log_mode) \
 	  -thread.count=8 \
 	  -connection.per.thread=30 \
 	  -task.per.connection=1 \
 	  -compress="" \
 	  -encode.type=json \
-	  -stress.test.seconds=30
+	  -stress.test.seconds=60
 
 run_http1_pb:
 	dotnet run --project $(PRJ).csproj -- \
@@ -24,15 +27,17 @@ run_http1_pb:
 	  -encode.type=protobuf \
 	  -stress.test.seconds=30
 
+#make run_h2 log_mode=console_writeline
 run_h2:
 	dotnet run --project $(PRJ).csproj -- \
 	  -http2.addr=http://127.0.0.1:8092/api/v1/login \
+	  -query.string=log_output_mode=$(log_mode) \
 	  -thread.count=8 \
 	  -connection.per.thread=2 \
 	  -task.per.connection=10 \
 	  -compress="" \
 	  -encode.type=json \
-	  -stress.test.seconds=30
+	  -stress.test.seconds=60
 
 run_h2_pb:
 	dotnet run --project $(PRJ).csproj -- \

@@ -6,7 +6,7 @@ docker run -d --rm --name victorialogs \
   -m 2048m \
   -v /home/ahfu/VictoriaLogsData/:/data/ \
   -e GOMAXPROCS=4 \
-  victoriametrics/victoria-logs:latest \
+  victoriametrics/victoria-logs:v1.50.0 \
   -storageDataPath=/data/ \
   -inmemoryDataFlushInterval=30s \
   -memory.allowedPercent=80 \

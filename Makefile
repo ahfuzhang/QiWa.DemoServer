@@ -37,6 +37,8 @@ send_login_h2c:
 PRJ=QiWa.DemoServer
 BUILD_DIR=./build/Release/linux/amd64/
 
+# -p:PublishAot=true
+# -p:PublishTrimmed=false
 build_linux:
 	dotnet restore $(PRJ).csproj -r linux-x64
 	dotnet clean $(PRJ).csproj -r linux-x64 -c Release
@@ -59,7 +61,7 @@ docker_build:
 	docker build --platform linux/amd64 -t ahfuzhang/qiwa.demoserver .
 
 run-in-docker-linux-amd64:
-	docker run --rm \
+	docker run -it --rm \
 	    --platform=linux/amd64 \
 		-p 8091:8091 \
 		-p 8092:8092 \

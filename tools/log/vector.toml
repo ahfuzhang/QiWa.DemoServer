@@ -88,7 +88,7 @@ if !exists(.Message) {
 [sinks.jsonline_http]
 type = "http"
 inputs = ["parse"]
-uri = "http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp&_msg_field=Properties.Message&_stream_fields=Level&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields="
+uri = "http://192.168.1.248:9428/insert/jsonline?_time_field=Timestamp,_time&_msg_field=Properties.Message,Message&_stream_fields=Level,LogLevel,client_ip&ignore_fields=&decolorize_fields=&AccountID=0&ProjectID=0&debug=false&extra_fields="
 method = "post"
 encoding.codec = "json"
 request.retry_attempts = 0
