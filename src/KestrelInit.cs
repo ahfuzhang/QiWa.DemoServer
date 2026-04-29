@@ -7,6 +7,9 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OpenTelemetry.Metrics;
+using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
+using CmdlineArgs;
 
 /// <summary>
 /// 负责构建并配置 Kestrel WebApplication，包括端口监听、OpenTelemetry Metrics 和路由注册。
@@ -21,7 +24,7 @@ internal static class KestrelInit
     /// <param name="grpcPort">gRPC 监听端口（可选，基于 HTTP/2）。</param>
     /// <param name="callback">Task HandleAsync(HttpContext context)</param>
     /// <returns>已注册路由、尚未启动的 WebApplication 实例。</returns>
-    public static WebApplication Build(int http1Port, int? http2Port, int? grpcPort, Func<HttpContext, Task> callback)
+    public static WebApplication Build(int http1Port, int? http2Port, int? grpcPort, bool useTraceMe, System.Type res, Func<HttpContext, Task> callback)
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -46,6 +49,7 @@ internal static class KestrelInit
             kestrelOptions.ListenAnyIP(
                 http1Port,
                 listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
+            Console.WriteLine($"listen port {http1Port}");    
 
             // HTTP/2 端口（可选）
             if (http2Port.HasValue)
@@ -54,6 +58,7 @@ internal static class KestrelInit
                     http2Port.Value,
                     listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
                 kestrelOptions.Limits.Http2.MaxStreamsPerConnection = 200;
+                Console.WriteLine($"listen port {http2Port.Value}");
             }
 
             // gRPC 端口（可选，gRPC 基于 HTTP/2）
@@ -145,6 +150,10 @@ internal static class KestrelInit
         //     await context.Response.WriteAsync(filtered);
         // });
 
+        // 必须显式调用，避免 macOS 下 WebApplication 自动插入时机偏后，
+        // 导致 fallback 中间件里 ctx.GetEndpoint() 始终为 null，/healthz 返回 404。
+        app.UseRouting();
+
         // 启用响应压缩中间件（需在路由之前）
         app.UseResponseCompression();
 
@@ -155,9 +164,20 @@ internal static class KestrelInit
         app.MapPrometheusScrapingEndpoint().RequireHost(http1HostFilter);
         // /healthz - k8s 健康检查
         // todo: 配合内部逻辑，做得更复杂
-        app.MapGet("/healthz", () => "OK").RequireHost(http1HostFilter);
+        // 不加 RequireHost：HTTP2/gRPC 端口已由 HttpProtocols.Http2 限制，HTTP1 请求物理上无法到达那些端口。
+        // 且 .NET 10 的 HostMatcherPolicy 对 *:port 通配符匹配行为改变，会导致 macOS 下返回 404。
+        app.MapGet("/healthz", () => "OK");
         // /ready - k8s 就绪检查
-        app.MapGet("/ready", () => "OK").RequireHost(http1HostFilter);
+        app.MapGet("/ready", () => "OK");
+        if (useTraceMe)
+        {
+            TraceMe.ConfigureSpeedscope(app, res);
+            var generatedProfiles = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+            TraceMe.MapTraceMe(app, generatedProfiles);
+            TraceMe.MapProfile(app, generatedProfiles);
+            Console.WriteLine("visit /traceme?seconds=30 will collect cpu profile");
+        }
+
 
         // /login、/biz_logic 仅在 HTTP/1 和 HTTP/2 端口上生效，不暴露到 gRPC 端口
         var bizHostFilters = new List<string> { $"*:{http1Port}" };

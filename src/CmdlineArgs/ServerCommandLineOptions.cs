@@ -35,6 +35,9 @@ internal readonly struct ServerCommandLineOptions
     /// <summary>指定线程池最大线程数。</summary>
     public int? Cores { get; }
 
+    /// <summary>启用 CPU profiling（speedscope）端点。</summary>
+    public bool WithCpuProfiling { get; }
+
     /// <summary>
     /// 构造命令行解析后的服务配置对象。
     /// </summary>
@@ -47,7 +50,8 @@ internal readonly struct ServerCommandLineOptions
         int http1Port,
         int? http2Port,
         int? grpcPort,
-        int? cores)
+        int? cores,
+        bool withCpuProfiling)
     {
         LogLevel = logLevel;
         LogFlushIntervalMs = logFlushIntervalMs;
@@ -58,6 +62,7 @@ internal readonly struct ServerCommandLineOptions
         Http2Port = http2Port;
         GrpcPort = grpcPort;
         Cores = cores;
+        WithCpuProfiling = withCpuProfiling;
     }
 
     /// <summary>
@@ -88,6 +93,8 @@ internal readonly struct ServerCommandLineOptions
         var http2PortOption = new Option<int?>("-http2.port", () => null, "HTTP/2 port (optional)");
         var grpcPortOption = new Option<int?>("-grpc.port", () => null, "gRPC port (not support now)");
         var coresOption = new Option<int?>("-cores", () => null, "Thread pool's maximum thread count.");
+        var withCpuProfilingOption = new Option<bool>("-with.cpu.profiling", () => false,
+            "Enable CPU profiling endpoints (/traceme, /profile, /speedscope).");
         http1PortOption.IsRequired = true;
 
         var root = new RootCommand("DemoServer");
@@ -100,6 +107,7 @@ internal readonly struct ServerCommandLineOptions
         root.AddOption(http2PortOption);
         root.AddOption(grpcPortOption);
         root.AddOption(coresOption);
+        root.AddOption(withCpuProfilingOption);
 
         root.SetHandler(async context =>
         {
@@ -112,7 +120,8 @@ internal readonly struct ServerCommandLineOptions
                 http1Port: context.ParseResult.GetValueForOption(http1PortOption),
                 http2Port: context.ParseResult.GetValueForOption(http2PortOption),
                 grpcPort: context.ParseResult.GetValueForOption(grpcPortOption),
-                cores: context.ParseResult.GetValueForOption(coresOption));
+                cores: context.ParseResult.GetValueForOption(coresOption),
+                withCpuProfiling: context.ParseResult.GetValueForOption(withCpuProfilingOption));
             await handler(options);
         });
         return root;

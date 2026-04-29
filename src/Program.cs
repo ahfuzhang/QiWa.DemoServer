@@ -1,5 +1,6 @@
 namespace DemoServer;
 
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using CmdlineArgs;
 using QiWa.DebugUtils;
@@ -67,7 +68,17 @@ internal static class Program
         //RedisManager.Initialize();
 
         // 5. 构建 Kestrel Web 应用（端口监听、OpenTelemetry Metrics、路由注册）
-        var app = KestrelInit.Build(options.Http1Port, options.Http2Port, options.GrpcPort, Generated.Demo.Demo.HandleAsync);
+        var app = KestrelInit.Build(options.Http1Port, options.Http2Port, options.GrpcPort, options.WithCpuProfiling, typeof(Program), Generated.Demo.Demo.HandleAsync);
+
+        // 6. 可选：启用 CPU profiling 端点（-with.cpu.profiling）
+        // if (options.WithCpuProfiling)
+        // {
+        //     TraceMe.ConfigureSpeedscope(app, typeof(Program));
+        //     var generatedProfiles = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
+        //     TraceMe.MapTraceMe(app, generatedProfiles);
+        //     TraceMe.MapProfile(app, generatedProfiles);
+        //     Console.WriteLine("visit /traceme?seconds=30 will collect cpu profile");
+        // }
 
         // 8. Graceful Shutdown
         var cts = new CancellationTokenSource();

@@ -1,4 +1,21 @@
 
+./build/speedscope/.unpacked: ./build/speedscope-1.24.0.zip
+	mkdir -p build
+	if command -v unzip >/dev/null 2>&1; then \
+	  unzip -oq $< -d ./build; \
+	else \
+	  python3 -m zipfile -e $< ./build; \
+	fi
+	touch $@
+
+./build/speedscope-1.24.0.zip:
+	mkdir -p $(dir $@)
+	wget -O $@ https://github.com/jlfwong/speedscope/releases/download/v1.24.0/speedscope-1.24.0.zip
+
+download: ./build/speedscope/.unpacked
+	@echo "ok"
+
+
 QiWa.rpc:
 	hulu tu \
 	  -src=./proto/Demo.proto \
@@ -17,7 +34,8 @@ run:
 	  -log.global.tags=server=DemoServer \
 	  -http1.port=8091 \
 	  -http2.port=8092 \
-	  -cores=1
+	  -cores=1 \
+	  -with.cpu.profiling
 
 show_metrics:
 	curl --compressed -G "http://127.0.0.1:8091/metrics" -v

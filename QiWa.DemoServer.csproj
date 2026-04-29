@@ -9,6 +9,7 @@
     <!-- 自定义输出目录 build/ 位于项目根目录内，必须排除在 MSBuild glob 之外，
          否则上次构建产物会被重复包含进发布集，产生路径双重嵌套的 MSB3026 告警。-->
     <DefaultItemExcludes>$(DefaultItemExcludes);build/**</DefaultItemExcludes>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="generated/**/*.cs" />
@@ -39,6 +40,13 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="ZstdSharp.Port" Version="0.8.7" />
+    <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" Version="*" />
+    <PackageReference Include="Microsoft.Diagnostics.Tracing.TraceEvent" Version="*" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="8.0.0" />
   </ItemGroup>
-
+  <ItemGroup>
+    <EmbeddedResource Include="./build/speedscope/**/*">
+      <Link>speedscope/%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </EmbeddedResource>
+  </ItemGroup>
 </Project>
