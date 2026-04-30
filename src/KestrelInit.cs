@@ -10,6 +10,7 @@ using DemoServer.Metrics;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using CmdlineArgs;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// 负责构建并配置 Kestrel WebApplication，包括端口监听、OpenTelemetry Metrics 和路由注册。
@@ -24,7 +25,7 @@ internal static class KestrelInit
     /// <param name="grpcPort">gRPC 监听端口（可选，基于 HTTP/2）。</param>
     /// <param name="callback">Task HandleAsync(HttpContext context)</param>
     /// <returns>已注册路由、尚未启动的 WebApplication 实例。</returns>
-    public static WebApplication Build(int http1Port, int? http2Port, int? grpcPort, bool useTraceMe, System.Type res, Func<HttpContext, Task> callback)
+    public static WebApplication Build(ServerCommandLineOptions options, System.Type res, Func<HttpContext, Task> callback)
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -47,25 +48,25 @@ internal static class KestrelInit
         {
             // HTTP/1.1 端口（必须）
             kestrelOptions.ListenAnyIP(
-                http1Port,
+                options.Http1Port,
                 listenOptions => listenOptions.Protocols = HttpProtocols.Http1);
-            Console.WriteLine($"listen port {http1Port}");    
+            Console.WriteLine($"listen port {options.Http1Port}");
 
             // HTTP/2 端口（可选）
-            if (http2Port.HasValue)
+            if (options.Http2Port.HasValue)
             {
                 kestrelOptions.ListenAnyIP(
-                    http2Port.Value,
+                    options.Http2Port.Value,
                     listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
                 kestrelOptions.Limits.Http2.MaxStreamsPerConnection = 200;
-                Console.WriteLine($"listen port {http2Port.Value}");
+                Console.WriteLine($"listen port {options.Http2Port.Value}");
             }
 
             // gRPC 端口（可选，gRPC 基于 HTTP/2）
-            if (grpcPort.HasValue)
+            if (options.GrpcPort.HasValue)
             {
                 kestrelOptions.ListenAnyIP(
-                    grpcPort.Value,
+                    options.GrpcPort.Value,
                     listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
             }
         });
@@ -87,7 +88,11 @@ internal static class KestrelInit
         });
 
         // 配置 OpenTelemetry Metrics（含 Kestrel/Runtime 指标上报）
-        var metricsExporter = SnapshotMetricExporter.Register(builder, exportIntervalMilliseconds: 3_000);
+        var metricsExporter = SnapshotMetricExporter.Register(
+            builder,
+            exportIntervalMilliseconds: options.MetricIntervalMs,
+            pushAddr: options.MetricPushAddr ?? ""
+        );
         var app = builder.Build();
 
         // 必须显式调用，避免 macOS 下 WebApplication 自动插入时机偏后，
@@ -105,7 +110,7 @@ internal static class KestrelInit
         app.MapGet("/healthz", () => "OK");
         // /ready - k8s 就绪检查
         app.MapGet("/ready", () => "OK");
-        if (useTraceMe)
+        if (options.WithCpuProfiling)
         {
             TraceMe.ConfigureSpeedscope(app, res);
             var generatedProfiles = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);

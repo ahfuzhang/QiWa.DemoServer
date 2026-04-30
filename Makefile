@@ -29,15 +29,21 @@ QiWa.rpc:
 build:
 	dotnet build
 
+fmt:
+	dotnet format QiWa.DemoServer.csproj
+
 run:
-	dotnet run	-- -log.level=info \
+	dotnet run	-- \
+	  -log.level=debug \
 	  -log.flush.interval.ms=1000 \
 	  -log.buffer.size=4kb \
 	  -log.global.tags=server=DemoServer \
 	  -http1.port=8091 \
 	  -http2.port=8092 \
 	  -cores=1 \
-	  -with.cpu.profiling
+	  -with.cpu.profiling \
+	  -metric.interval.ms=1000 \
+	  -metric.push.addr="http://127.0.0.1:8428/api/v1/import/prometheus?extra_label=env=prod&extra_label=app=demo"
 
 run-with-log:
 	dotnet run	-- -log.level=info \

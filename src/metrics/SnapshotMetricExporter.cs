@@ -320,12 +320,13 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
         var content = new ReadOnlyMemoryContent(buf.Data.AsMemory(0, buf.Length));
         content.Headers.ContentEncoding.Add("zstd");
         content.Headers.ContentType = mediaType;
-        _ = _client!.PostAsync("", content).ContinueWith(t => {
+        _ = _client!.PostAsync("", content).ContinueWith(t =>
+        {
             buf.Dispose();
             var statusCode = (int)t.Result.StatusCode;
             if (t.IsFaulted)
             {
-                
+
                 ThreadLocalLogger.Current.Warn(
                     Field.Utf8String("_msg"u8, "post metrics fail"u8),
                     Field.String("url"u8, _client!.BaseAddress!.ToString()),

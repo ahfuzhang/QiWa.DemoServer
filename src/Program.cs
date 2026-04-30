@@ -43,7 +43,7 @@ internal static class Program
             flushIntervalMs: options.LogFlushIntervalMs,
             tags: tags,
             logBufferSize: logBufferBytes,
-            jsonlineUrl: options.LogPushAddr ?? "");        
+            jsonlineUrl: options.LogPushAddr ?? "");
     }
 
     /// <summary>
@@ -70,8 +70,7 @@ internal static class Program
         // }
 
         // 构建 Kestrel Web 应用（端口监听、OpenTelemetry Metrics、路由注册）
-        var app = KestrelInit.Build(options.Http1Port, options.Http2Port, options.GrpcPort, 
-            options.WithCpuProfiling, typeof(Program), Generated.Demo.Demo.HandleAsync);
+        var app = KestrelInit.Build(options, typeof(Program), Generated.Demo.Demo.HandleAsync);
 
         // Graceful Shutdown
         var cts = new CancellationTokenSource();

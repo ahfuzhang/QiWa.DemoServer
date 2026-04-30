@@ -38,6 +38,12 @@ internal readonly struct ServerCommandLineOptions
     /// <summary>启用 CPU profiling（speedscope）端点。</summary>
     public bool WithCpuProfiling { get; }
 
+    /// <summary>metrics export 的时间间隔，单位毫秒。</summary>
+    public int MetricIntervalMs { get; }
+
+    /// <summary>metrics 的 push 地址。</summary>
+    public string? MetricPushAddr { get; }
+
     /// <summary>
     /// 构造命令行解析后的服务配置对象。
     /// </summary>
@@ -51,7 +57,9 @@ internal readonly struct ServerCommandLineOptions
         int? http2Port,
         int? grpcPort,
         int? cores,
-        bool withCpuProfiling)
+        bool withCpuProfiling,
+        int metricIntervalMs,
+        string? metricPushAddr)
     {
         LogLevel = logLevel;
         LogFlushIntervalMs = logFlushIntervalMs;
@@ -63,6 +71,8 @@ internal readonly struct ServerCommandLineOptions
         GrpcPort = grpcPort;
         Cores = cores;
         WithCpuProfiling = withCpuProfiling;
+        MetricIntervalMs = metricIntervalMs;
+        MetricPushAddr = metricPushAddr;
     }
 
     /// <summary>
@@ -95,6 +105,10 @@ internal readonly struct ServerCommandLineOptions
         var coresOption = new Option<int?>("-cores", () => null, "Thread pool's maximum thread count.");
         var withCpuProfilingOption = new Option<bool>("-with.cpu.profiling", () => false,
             "Enable CPU profiling endpoints (/traceme, /profile, /speedscope).");
+        var metricIntervalMsOption = new Option<int>("-metric.interval.ms", () => 15000,
+            "Metrics export interval (ms).");
+        var metricPushAddrOption = new Option<string?>("-metric.push.addr", () => null,
+            "Metrics push address.");
         http1PortOption.IsRequired = true;
 
         var root = new RootCommand("DemoServer");
@@ -108,6 +122,8 @@ internal readonly struct ServerCommandLineOptions
         root.AddOption(grpcPortOption);
         root.AddOption(coresOption);
         root.AddOption(withCpuProfilingOption);
+        root.AddOption(metricIntervalMsOption);
+        root.AddOption(metricPushAddrOption);
 
         root.SetHandler(async context =>
         {
@@ -121,7 +137,9 @@ internal readonly struct ServerCommandLineOptions
                 http2Port: context.ParseResult.GetValueForOption(http2PortOption),
                 grpcPort: context.ParseResult.GetValueForOption(grpcPortOption),
                 cores: context.ParseResult.GetValueForOption(coresOption),
-                withCpuProfiling: context.ParseResult.GetValueForOption(withCpuProfilingOption));
+                withCpuProfiling: context.ParseResult.GetValueForOption(withCpuProfilingOption),
+                metricIntervalMs: context.ParseResult.GetValueForOption(metricIntervalMsOption),
+                metricPushAddr: context.ParseResult.GetValueForOption(metricPushAddrOption));
             await handler(options);
         });
         return root;
