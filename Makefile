@@ -24,6 +24,8 @@ QiWa.rpc:
 	  -src.csharp_template.dir=./templates/QiWa.rpc/ \
 	  -dst.csharp_template.out_dir=./generated/Demo/
 
+.PHONY: build
+
 build:
 	dotnet build
 

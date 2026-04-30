@@ -24,6 +24,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.7" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.7" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.EventCounters" Version="1.15.1-alpha.1" />
     <PackageReference Include="QiWa.Common" Version="0.1.6" />
     <PackageReference Include="QiWa.framework" Version="0.2.4" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />

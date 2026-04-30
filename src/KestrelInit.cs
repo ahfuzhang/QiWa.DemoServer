@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using DemoServer.Metrics;
-using OpenTelemetry.Metrics;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using CmdlineArgs;
@@ -88,71 +87,8 @@ internal static class KestrelInit
         });
 
         // 配置 OpenTelemetry Metrics（含 Kestrel/Runtime 指标上报）
-        var metricsExporter = new SnapshotMetricExporter();
-        builder.Services.AddOpenTelemetry()
-            .WithMetrics(metrics =>
-            {
-                // 每 15 s 收集一次，与 Prometheus 默认抓取周期对齐；启动时立即收集一次
-                metrics.AddReader(new PeriodicExportingMetricReader(metricsExporter, exportIntervalMilliseconds: 3_000));
-                metrics.AddProcessInstrumentation();
-                metrics.AddRuntimeInstrumentation();
-                metrics.AddHttpClientInstrumentation();
-                metrics.AddAspNetCoreInstrumentation();
-                metrics.AddMeter(
-                    "System.Runtime",
-                    "System.Net.Http",
-                    "System.Net.Sockets",
-                    "Microsoft.AspNetCore.Hosting",
-                    "Microsoft.AspNetCore.Server.Kestrel",
-                    "OpenTelemetry.Instrumentation.Process");
-            });
-        // if (grpcPort.HasValue)
-        // {
-        //     //builder.Services.AddGrpc();
-        //     builder.Services.AddGrpc(options =>
-        //         {
-        //             // 替换掉真正的 gzip provider，用透传版本
-        //             options.CompressionProviders.Add(new DemoLoginServer.GrpcUtils.PassthroughCompressionProvider("gzip"));
-        //             options.CompressionProviders.Add(new DemoLoginServer.GrpcUtils.PassthroughCompressionProvider("zstd"));
-
-        //             // 全局默认用 gzip（框架会设 compressed-flag=1 并写 grpc-encoding: gzip）
-        //             options.ResponseCompressionAlgorithm = "gzip";
-        //             options.ResponseCompressionLevel = System.IO.Compression.CompressionLevel.NoCompression; // 无意义，但保持一致
-        //         }
-        //     );
-
-        // }
+        var metricsExporter = SnapshotMetricExporter.Register(builder, exportIntervalMilliseconds: 3_000);
         var app = builder.Build();
-
-        // 对 /metrics 强制注入 Accept-Encoding: gzip，使压缩中间件无论客户端是否声明都生效
-        // 同时过滤掉 Prometheus 注释行（# HELP / # TYPE）
-        // app.Use(async (context, next) =>
-        // {
-        //     if (!context.Request.Path.StartsWithSegments("/metrics"))
-        //     {
-        //         await next();
-        //         return;
-        //     }
-        //     context.Request.Headers["Accept-Encoding"] = "gzip";
-
-        //     var originalBody = context.Response.Body;
-        //     using var buffered = new MemoryStream();
-        //     context.Response.Body = buffered;
-        //     await next();
-
-        //     buffered.Seek(0, SeekOrigin.Begin);
-        //     using var reader = new StreamReader(buffered, leaveOpen: true);
-        //     var raw = await reader.ReadToEndAsync();
-
-        //     var filtered = string.Concat(
-        //         raw.Split('\n')
-        //            .Where(line => !line.StartsWith('#'))
-        //            .Select(line => line + '\n'));
-
-        //     context.Response.Body = originalBody;
-        //     context.Response.ContentLength = System.Text.Encoding.UTF8.GetByteCount(filtered);
-        //     await context.Response.WriteAsync(filtered);
-        // });
 
         // 必须显式调用，避免 macOS 下 WebApplication 自动插入时机偏后，
         // 导致 fallback 中间件里 ctx.GetEndpoint() 始终为 null，/healthz 返回 404。
@@ -162,14 +98,10 @@ internal static class KestrelInit
         app.UseResponseCompression();
 
         // 注册路由
-        // /metrics、/healthz、/ready 仅在 HTTP/1 端口上生效，避免暴露到 gRPC/HTTP2 端口
-        //var http1HostFilter = $"*:{http1Port}";
         // /metrics - 自定义 Prometheus 格式输出，由 SnapshotMetricExporter 定期刷新
-        app.MapGet("/metrics", () => Results.Text(metricsExporter.GetScrape(), "text/plain; version=0.0.4; charset=utf-8"));
-        // /healthz - k8s 健康检查
+        app.MapGet("/metrics", metricsExporter.HandleMetricsAsync);
+
         // todo: 配合内部逻辑，做得更复杂
-        // 不加 RequireHost：HTTP2/gRPC 端口已由 HttpProtocols.Http2 限制，HTTP1 请求物理上无法到达那些端口。
-        // 且 .NET 10 的 HostMatcherPolicy 对 *:port 通配符匹配行为改变，会导致 macOS 下返回 404。
         app.MapGet("/healthz", () => "OK");
         // /ready - k8s 就绪检查
         app.MapGet("/ready", () => "OK");
@@ -182,25 +114,6 @@ internal static class KestrelInit
             Console.WriteLine("visit /traceme?seconds=30 will collect cpu profile");
         }
 
-
-        // /login、/biz_logic 仅在 HTTP/1 和 HTTP/2 端口上生效，不暴露到 gRPC 端口
-        // var bizHostFilters = new List<string> { $"*:{http1Port}" };
-        // if (http2Port.HasValue)
-        //     bizHostFilters.Add($"*:{http2Port.Value}");
-        // var bizHostFilterArray = bizHostFilters.ToArray();
-
-        // /login - 用户登录
-        // app.MapPost("/login", LoginHandler.HandleAsync).RequireHost(bizHostFilterArray);
-        // // /biz_logic - 业务接口（需要鉴权）
-        // app.MapPost("/biz_logic", BizHandler.HandleAsync).RequireHost(bizHostFilterArray);
-        // // 所有 HTTP/1.1 未匹配路由的请求，统一走 Http1Handler 兜底处理
-        // app.MapFallback(Http1Handler.HandleAsync).RequireHost(http1HostFilter);
-        // 所有 HTTP/2 未匹配路由的请求，统一走 Http2Handler 兜底处理
-        // if (http2Port.HasValue)
-        // {
-        //     app.MapFallback(Http2Handler.HandleAsync).RequireHost($"*:{http2Port.Value}");
-        // }
-        // //
         // if (grpcPort.HasValue)
         // {
         //     // todo: 使用全局的拦截器

@@ -22,19 +22,8 @@ internal static class Program
         return await ServerCommandLineOptions.InvokeAsync(args, RunServerAsync);
     }
 
-    /// <summary>
-    /// 根据命令行配置启动登录服务并负责关闭前清理。
-    /// </summary>
-    private static async Task RunServerAsync(ServerCommandLineOptions options)
+    private static void InitLogger(ServerCommandLineOptions options)
     {
-        // 1. 设置线程池最大线程数
-        if (options.Cores.HasValue)
-        {
-            ThreadPool.SetMinThreads(options.Cores.Value, options.Cores.Value);
-            ThreadPool.SetMaxThreads(options.Cores.Value, options.Cores.Value);
-        }
-
-        // 2. 初始化日志库（来自 src/ConsoleLogger/Logger.cs）
         var logLevelEnum = Logger.ParseLogLevel(options.LogLevel);
         var (logBufferLong, bufErr) = QiWa.StringUtils.StringUtils.ParseBufferSize(options.LogBufferSize);
         if (bufErr.Err())
@@ -54,9 +43,25 @@ internal static class Program
             flushIntervalMs: options.LogFlushIntervalMs,
             tags: tags,
             logBufferSize: logBufferBytes,
-            jsonlineUrl: options.LogPushAddr ?? "");
+            jsonlineUrl: options.LogPushAddr ?? "");        
+    }
 
-        // 3. 加载配置文件
+    /// <summary>
+    /// 根据命令行配置启动登录服务并负责关闭前清理。
+    /// </summary>
+    private static async Task RunServerAsync(ServerCommandLineOptions options)
+    {
+        // 设置线程池最大线程数
+        if (options.Cores.HasValue)
+        {
+            ThreadPool.SetMinThreads(options.Cores.Value, options.Cores.Value);
+            ThreadPool.SetMaxThreads(options.Cores.Value, options.Cores.Value);
+        }
+
+        // 初始化日志库（来自 QiWa.ConsoleLogger）
+        InitLogger(options);
+
+        // todo: 加载配置文件
         // var configErr = AppConfig.Load("config.yaml");
         // if (configErr.Err())
         // {
@@ -64,23 +69,11 @@ internal static class Program
         //     Environment.Exit(1);
         // }
 
-        // 4. 初始化 Redis
-        //RedisManager.Initialize();
+        // 构建 Kestrel Web 应用（端口监听、OpenTelemetry Metrics、路由注册）
+        var app = KestrelInit.Build(options.Http1Port, options.Http2Port, options.GrpcPort, 
+            options.WithCpuProfiling, typeof(Program), Generated.Demo.Demo.HandleAsync);
 
-        // 5. 构建 Kestrel Web 应用（端口监听、OpenTelemetry Metrics、路由注册）
-        var app = KestrelInit.Build(options.Http1Port, options.Http2Port, options.GrpcPort, options.WithCpuProfiling, typeof(Program), Generated.Demo.Demo.HandleAsync);
-
-        // 6. 可选：启用 CPU profiling 端点（-with.cpu.profiling）
-        // if (options.WithCpuProfiling)
-        // {
-        //     TraceMe.ConfigureSpeedscope(app, typeof(Program));
-        //     var generatedProfiles = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
-        //     TraceMe.MapTraceMe(app, generatedProfiles);
-        //     TraceMe.MapProfile(app, generatedProfiles);
-        //     Console.WriteLine("visit /traceme?seconds=30 will collect cpu profile");
-        // }
-
-        // 8. Graceful Shutdown
+        // Graceful Shutdown
         var cts = new CancellationTokenSource();
         // 注册 SIGTERM 信号处理（k8s 会发送 SIGTERM 关闭 pod）
         using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, ctx =>
@@ -96,17 +89,11 @@ internal static class Program
         };
 
         await app.StartAsync(cts.Token);  // 开始监听端口
-
         //
         ThreadLocalLogger.Current.Info(
             Field.String("event"u8, "server_started"),
             Field.Int64("http1_port"u8, options.Http1Port)
         );
-        // var log = Logger.Get();
-        // log.Info(
-        //     Field.String("event"u8, "server_started"),
-        //     Field.Int64("http1_port"u8, options.Http1Port));
-        // Logger.Return(log);
 
         try
         {
@@ -117,12 +104,15 @@ internal static class Program
         await app.StopAsync();
 
         // 关闭前清理资源
-        //RedisManager.Shutdown();
+        Shutdown(options);
+    }
+
+    private static void Shutdown(ServerCommandLineOptions options)
+    {
         ThreadLocalLogger.Current.Info(
             Field.String("event"u8, "server_shutdown"),
             Field.Int64("http1_port"u8, options.Http1Port)
         );
         Logger.Shutdown();
     }
-
 }
