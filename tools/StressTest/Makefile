@@ -28,6 +28,7 @@ run_http1_pb:
 	  -stress.test.seconds=30
 
 #make run_h2 log_mode=console_writeline
+#make run_h2 log_mode=qiwa_logger
 run_h2:
 	dotnet run --project $(PRJ).csproj -- \
 	  -http2.addr=http://127.0.0.1:8092/api/v1/login \

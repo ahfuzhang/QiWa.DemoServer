@@ -1,3 +1,5 @@
+// 注意：本功能在 AOT 模式下会导致进程发生 exit code 139 崩溃。
+
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Tracing;

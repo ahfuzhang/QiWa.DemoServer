@@ -46,10 +46,10 @@ class MsLogger
         using (logger.BeginScope(new Dictionary<string, object>
         {
             ["request"] = requestJson,
-            ["path"] = ctx!.Request!.Path.Value,
+            ["path"] = ctx!.Request!.Path.Value ?? "",
             ["method"] = ctx!.Request!.Method,
             ["protocol"] = ctx!.Request!.Protocol,
-            ["client_ip"] = ctx!.Connection.RemoteIpAddress,
+            ["client_ip"] = ctx!.Connection.RemoteIpAddress?.ToString() ?? "",
             ["_file"] = file,
             ["_line"] = line,
             ["_func"] = func,
@@ -189,6 +189,8 @@ class LoginContext : ContextBase, QiWa.Common.IResettable
         return default;
     }
 
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("Trimming", "IL2026:Intentional reflection-based JSON serialization for demo")]
+    [System.Diagnostics.CodeAnalysis.UnconditionalSuppressMessage("AOT", "IL3050:Intentional reflection-based JSON serialization for demo")]
     private void JsonEncode(HttpContext ctx,
         string requestJson,
         [CallerFilePath] string file = "",
@@ -219,10 +221,10 @@ class LoginContext : ContextBase, QiWa.Common.IResettable
         var st = new LoginRequestLog
         {
             request = requestJson,
-            path = ctx.Request.Path.Value,
+            path = ctx.Request.Path.Value ?? "",
             method = ctx.Request.Method,
             protocol = ctx.Request.Protocol,
-            client_ip = ctx.Connection.RemoteIpAddress.ToString(),
+            client_ip = ctx.Connection.RemoteIpAddress?.ToString() ?? "",
             _file = file,
             _line = line,
             _func = func,

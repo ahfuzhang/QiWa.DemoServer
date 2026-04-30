@@ -39,6 +39,23 @@ run:
 	  -cores=1 \
 	  -with.cpu.profiling
 
+run-with-log:
+	dotnet run	-- -log.level=info \
+	  -log.flush.interval.ms=1000 \
+	  -log.buffer.size=4kb \
+	  -log.global.tags=server=DemoServer \
+	  -http1.port=8091 \
+	  -http2.port=8092 \
+	  -cores=1 \
+	  -with.cpu.profiling 2>&1 | \
+	docker run --rm -i \
+		--network="host" \
+		--cpuset-cpus="18" \
+		-m 512m \
+		-v "./tools/log/vector.toml:/etc/vector/vector.toml:ro" \
+		timberio/vector:latest-alpine \
+		-c /etc/vector/vector.toml
+
 show_metrics:
 	curl --compressed -G "http://127.0.0.1:8091/metrics" -v
 
@@ -95,7 +112,8 @@ run-in-docker-linux-amd64:
 			-log.global.tags="server=DemoServer&pod=demo-server-123456&namespace=asia" \
 			-http1.port=8091 \
 			-http2.port=8092 \
-			-cores=1
+			-cores=1 \
+			-with.cpu.profiling
 
 run-in-docker-linux-amd64-with-log:
 	docker run --rm \
@@ -110,7 +128,9 @@ run-in-docker-linux-amd64-with-log:
 			-log.global.tags="server=DemoServer&pod=demo-server-123456&namespace=asia" \
 			-http1.port=8091 \
 			-http2.port=8092 \
-			-cores=1 2>&1 | \
+			-cores=1 \
+			-with.cpu.profiling \
+			2>&1 | \
 	docker run --rm -i \
 		--network="host" \
 		--cpuset-cpus="18" \

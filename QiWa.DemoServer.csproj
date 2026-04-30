@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <!-- CA2007: ASP.NET Core 应用无 SynchronizationContext，无需 ConfigureAwait -->
     <NoWarn>$(NoWarn);CA2007</NoWarn>
+    <!-- IL2104/IL3053/IL3002: 第三方包 TraceEvent、Serilog 尚未完全支持 AOT/trim，忽略其产生的汇编级别警告 -->
+    <NoWarn>$(NoWarn);IL2104;IL3053;IL3002</NoWarn>
     <!-- 自定义输出目录 build/ 位于项目根目录内，必须排除在 MSBuild glob 之外，
          否则上次构建产物会被重复包含进发布集，产生路径双重嵌套的 MSB3026 告警。-->
     <DefaultItemExcludes>$(DefaultItemExcludes);build/**</DefaultItemExcludes>
@@ -22,8 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.7" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.7" />
     <PackageReference Include="OpenTelemetry.Instrumentation.EventCounters" Version="1.15.1-alpha.1" />
     <PackageReference Include="QiWa.Common" Version="0.1.6" />
     <PackageReference Include="QiWa.framework" Version="0.2.4" />
