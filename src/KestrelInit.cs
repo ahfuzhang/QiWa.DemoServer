@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using DemoServer.Metrics;
 using OpenTelemetry.Metrics;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
@@ -87,10 +88,12 @@ internal static class KestrelInit
         });
 
         // 配置 OpenTelemetry Metrics（含 Kestrel/Runtime 指标上报）
+        var metricsExporter = new SnapshotMetricExporter();
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
-                metrics.AddPrometheusExporter();
+                // 每 15 s 收集一次，与 Prometheus 默认抓取周期对齐；启动时立即收集一次
+                metrics.AddReader(new PeriodicExportingMetricReader(metricsExporter, exportIntervalMilliseconds: 3_000));
                 metrics.AddProcessInstrumentation();
                 metrics.AddRuntimeInstrumentation();
                 metrics.AddHttpClientInstrumentation();
@@ -100,7 +103,8 @@ internal static class KestrelInit
                     "System.Net.Http",
                     "System.Net.Sockets",
                     "Microsoft.AspNetCore.Hosting",
-                    "Microsoft.AspNetCore.Server.Kestrel");
+                    "Microsoft.AspNetCore.Server.Kestrel",
+                    "OpenTelemetry.Instrumentation.Process");
             });
         // if (grpcPort.HasValue)
         // {
@@ -159,9 +163,9 @@ internal static class KestrelInit
 
         // 注册路由
         // /metrics、/healthz、/ready 仅在 HTTP/1 端口上生效，避免暴露到 gRPC/HTTP2 端口
-        var http1HostFilter = $"*:{http1Port}";
-        // /metrics - Prometheus 格式的 metrics 数据
-        app.MapPrometheusScrapingEndpoint().RequireHost(http1HostFilter);
+        //var http1HostFilter = $"*:{http1Port}";
+        // /metrics - 自定义 Prometheus 格式输出，由 SnapshotMetricExporter 定期刷新
+        app.MapGet("/metrics", () => Results.Text(metricsExporter.GetScrape(), "text/plain; version=0.0.4; charset=utf-8"));
         // /healthz - k8s 健康检查
         // todo: 配合内部逻辑，做得更复杂
         // 不加 RequireHost：HTTP2/gRPC 端口已由 HttpProtocols.Http2 限制，HTTP1 请求物理上无法到达那些端口。
@@ -180,10 +184,11 @@ internal static class KestrelInit
 
 
         // /login、/biz_logic 仅在 HTTP/1 和 HTTP/2 端口上生效，不暴露到 gRPC 端口
-        var bizHostFilters = new List<string> { $"*:{http1Port}" };
-        if (http2Port.HasValue)
-            bizHostFilters.Add($"*:{http2Port.Value}");
-        var bizHostFilterArray = bizHostFilters.ToArray();
+        // var bizHostFilters = new List<string> { $"*:{http1Port}" };
+        // if (http2Port.HasValue)
+        //     bizHostFilters.Add($"*:{http2Port.Value}");
+        // var bizHostFilterArray = bizHostFilters.ToArray();
+
         // /login - 用户登录
         // app.MapPost("/login", LoginHandler.HandleAsync).RequireHost(bizHostFilterArray);
         // // /biz_logic - 业务接口（需要鉴权）
