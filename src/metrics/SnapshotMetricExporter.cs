@@ -22,18 +22,30 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
     RentedBuffer compressed;
     private readonly ReaderWriterLockSlim _swapLock = new();
     const int defaultBufferSize = 1024 * 16;
+    private HttpClient? _client;
+    //private readonly string _tagsQueryString;
 
+    private Timer? _pushTimer;
 
-    private SnapshotMetricExporter()
+    private SnapshotMetricExporter(string pushAddr, int exportIntervalMilliseconds)
     {
         _current = new RentedBuffer(defaultBufferSize);
         _last = new RentedBuffer(defaultBufferSize);
         compressed = new RentedBuffer(defaultBufferSize);
+        if (!string.IsNullOrEmpty(pushAddr))
+        {
+            _client = new HttpClient { BaseAddress = new Uri(pushAddr) };
+            _pushTimer = new Timer(PushToRemote, null, exportIntervalMilliseconds + 1000, exportIntervalMilliseconds);
+        }
+        // _tagsQueryString = tags is { Count: > 0 }
+        //     ? string.Join("&", tags.Select(kv => $"{Uri.EscapeDataString(kv.Key)}={Uri.EscapeDataString(kv.Value)}"))
+        //     : string.Empty;
     }
 
-    public static SnapshotMetricExporter Register(WebApplicationBuilder builder, int exportIntervalMilliseconds)
+    public static SnapshotMetricExporter Register(WebApplicationBuilder builder, int exportIntervalMilliseconds,
+        string pushAddr = "")
     {
-        var exporter = new SnapshotMetricExporter();
+        var exporter = new SnapshotMetricExporter(pushAddr, exportIntervalMilliseconds);
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
@@ -283,6 +295,57 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
         }
         else
             _current.Append(value.ToString("G", CultureInfo.InvariantCulture));
+    }
+
+    private static readonly System.Net.Http.Headers.MediaTypeHeaderValue mediaType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+
+    private void PushToRemote(object? state)
+    {
+        //_ = Task.Run(()=>{
+        var buf = new RentedBuffer(_last.Length);
+        _swapLock.EnterReadLock();
+        try
+        {
+            ZstdCompressor.Compress(ref buf, _last.AsSpan());
+        }
+        finally
+        {
+            _swapLock.ExitReadLock();
+        }
+        if (buf.Length == 0)
+        {
+            buf.Dispose();
+            return;
+        }
+        var content = new ReadOnlyMemoryContent(buf.Data.AsMemory(0, buf.Length));
+        content.Headers.ContentEncoding.Add("zstd");
+        content.Headers.ContentType = mediaType;
+        _ = _client!.PostAsync("", content).ContinueWith(t => {
+            buf.Dispose();
+            var statusCode = (int)t.Result.StatusCode;
+            if (t.IsFaulted)
+            {
+                
+                ThreadLocalLogger.Current.Warn(
+                    Field.Utf8String("_msg"u8, "post metrics fail"u8),
+                    Field.String("url"u8, _client!.BaseAddress!.ToString()),
+                    Field.Int64("status_code"u8, statusCode)
+                );
+                return;
+            }
+            ThreadLocalLogger.Current.Debug(
+                Field.Utf8String("_msg"u8, "post metrics success"u8),
+                Field.Int64("status_code"u8, statusCode)
+            );
+        });
+        //});
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+            _pushTimer?.Dispose();
+        base.Dispose(disposing);
     }
 
     private static string PrometheusType(MetricType type) => type switch
