@@ -1,0 +1,9 @@
+{
+  "dotnet.defaultSolution": "QiWa.DemoServer.slnx",
+  "omnisharp.defaultLaunchSolution": "QiWa.DemoServer.slnx",
+  "files.associations": {
+    "Makefile_*": "makefile",
+    "*.cs.tpl": "csharp"
+  },
+  "extensions.supportNodeGlobalNavigator": true
+}

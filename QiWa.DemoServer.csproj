@@ -26,13 +26,14 @@
   <ItemGroup>
     <PackageReference Include="OpenTelemetry.Instrumentation.EventCounters" Version="1.15.1-alpha.1" />
     <PackageReference Include="QiWa.Common" Version="0.1.6" />
-    <PackageReference Include="QiWa.framework" Version="0.2.4" />
+    <PackageReference Include="QiWa.framework" Version="0.3.0" />
     <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="OpenTelemetry" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Api" Version="1.15.3" />
+    <!--1.15.0版本有漏洞-->
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.9.0-beta.1" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />

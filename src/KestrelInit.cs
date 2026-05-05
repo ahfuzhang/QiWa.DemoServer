@@ -59,6 +59,7 @@ internal static class KestrelInit
                     options.Http2Port.Value,
                     listenOptions => listenOptions.Protocols = HttpProtocols.Http2);
                 kestrelOptions.Limits.Http2.MaxStreamsPerConnection = 200;
+                // todo: 这里的 200 做成可配置的
                 Console.WriteLine($"listen port {options.Http2Port.Value}");
             }
 
@@ -88,11 +89,20 @@ internal static class KestrelInit
         });
 
         // 配置 OpenTelemetry Metrics（含 Kestrel/Runtime 指标上报）
-        var metricsExporter = SnapshotMetricExporter.Register(
+        var err = SnapshotMetricExporter.Init(
             builder,
             exportIntervalMilliseconds: options.MetricIntervalMs,
             pushAddr: options.MetricPushAddr ?? ""
         );
+        if (err.Err())
+        {
+            Console.WriteLine($"metrics init fail: code={err.Code}, message={err.Message}");
+            Environment.Exit(-1);
+        }
+        // 把输出 metrics 的方法注册进去
+        SnapshotMetricExporter.Singleton!.AddCountersGenerator<QiWa.KestrelWrap.Counters>(QiWa.KestrelWrap.ContextBase.SumCounters);
+        SnapshotMetricExporter.Singleton!.AddCountersGenerator<Generated.Demo.DemoCounters>(Generated.Demo.Demo.SumCounters);
+
         var app = builder.Build();
 
         // 必须显式调用，避免 macOS 下 WebApplication 自动插入时机偏后，
@@ -104,7 +114,7 @@ internal static class KestrelInit
 
         // 注册路由
         // /metrics - 自定义 Prometheus 格式输出，由 SnapshotMetricExporter 定期刷新
-        app.MapGet("/metrics", metricsExporter.HandleMetricsAsync);
+        app.MapGet("/metrics", SnapshotMetricExporter.Singleton!.HandleMetricsAsync);
 
         // todo: 配合内部逻辑，做得更复杂
         app.MapGet("/healthz", () => "OK");

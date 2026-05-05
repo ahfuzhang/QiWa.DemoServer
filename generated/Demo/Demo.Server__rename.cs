@@ -20,6 +20,8 @@ public class DemoCounters : QiWa.Metrics.MetricsBase, QiWa.Common.IResettable
     public UInt64 LoginExceptionsTotal;
     [PrometheusMetric("errors_total", "service=\"Demo\",method=\"Login\",error_type=\"logic error\"")]
     public UInt64 LoginLogicErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"Login\",error_type=\"internal error\"")]
+    public UInt64 LoginInternalErrorsTotal;
     [PrometheusMetric("http_request_total", "service=\"Demo\",method=\"GetUserInfo\"")]
     public UInt64 GetUserInfoRequestTotal;
     [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"decode\"")]
@@ -28,6 +30,8 @@ public class DemoCounters : QiWa.Metrics.MetricsBase, QiWa.Common.IResettable
     public UInt64 GetUserInfoExceptionsTotal;
     [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"logic error\"")]
     public UInt64 GetUserInfoLogicErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"GetUserInfo\",error_type=\"internal error\"")]
+    public UInt64 GetUserInfoInternalErrorsTotal;
     [PrometheusMetric("http_request_total", "service=\"Demo\",method=\"SetUserTags\"")]
     public UInt64 SetUserTagsRequestTotal;
     [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"decode\"")]
@@ -36,6 +40,8 @@ public class DemoCounters : QiWa.Metrics.MetricsBase, QiWa.Common.IResettable
     public UInt64 SetUserTagsExceptionsTotal;
     [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"logic error\"")]
     public UInt64 SetUserTagsLogicErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"Demo\",method=\"SetUserTags\",error_type=\"internal error\"")]
+    public UInt64 SetUserTagsInternalErrorsTotal;
 
     public void Reset()
     {
@@ -43,14 +49,17 @@ public class DemoCounters : QiWa.Metrics.MetricsBase, QiWa.Common.IResettable
         LoginDecodeErrorsTotal = 0;
         LoginExceptionsTotal = 0;
         LoginLogicErrorsTotal = 0;
+        LoginInternalErrorsTotal = 0;
         GetUserInfoRequestTotal = 0;
         GetUserInfoDecodeErrorsTotal = 0;
         GetUserInfoExceptionsTotal = 0;
         GetUserInfoLogicErrorsTotal = 0;
+        GetUserInfoInternalErrorsTotal = 0;
         SetUserTagsRequestTotal = 0;
         SetUserTagsDecodeErrorsTotal = 0;
         SetUserTagsExceptionsTotal = 0;
         SetUserTagsLogicErrorsTotal = 0;
+        SetUserTagsInternalErrorsTotal = 0;
     }
 }
 
@@ -86,14 +95,17 @@ public class Demo  // 这里是 service 的名字
             dst.LoginDecodeErrorsTotal = Interlocked.Read(ref c.LoginDecodeErrorsTotal);
             dst.LoginExceptionsTotal = Interlocked.Read(ref c.LoginExceptionsTotal);
             dst.LoginLogicErrorsTotal = Interlocked.Read(ref c.LoginLogicErrorsTotal);
+            dst.LoginInternalErrorsTotal = Interlocked.Read(ref c.LoginInternalErrorsTotal);
             dst.GetUserInfoRequestTotal = Interlocked.Read(ref c.GetUserInfoRequestTotal);
             dst.GetUserInfoDecodeErrorsTotal = Interlocked.Read(ref c.GetUserInfoDecodeErrorsTotal);
             dst.GetUserInfoExceptionsTotal = Interlocked.Read(ref c.GetUserInfoExceptionsTotal);
             dst.GetUserInfoLogicErrorsTotal = Interlocked.Read(ref c.GetUserInfoLogicErrorsTotal);
+            dst.GetUserInfoInternalErrorsTotal = Interlocked.Read(ref c.GetUserInfoInternalErrorsTotal);
             dst.SetUserTagsRequestTotal = Interlocked.Read(ref c.SetUserTagsRequestTotal);
             dst.SetUserTagsDecodeErrorsTotal = Interlocked.Read(ref c.SetUserTagsDecodeErrorsTotal);
             dst.SetUserTagsExceptionsTotal = Interlocked.Read(ref c.SetUserTagsExceptionsTotal);
-            dst.SetUserTagsLogicErrorsTotal = Interlocked.Read(ref c.SetUserTagsLogicErrorsTotal);            
+            dst.SetUserTagsLogicErrorsTotal = Interlocked.Read(ref c.SetUserTagsLogicErrorsTotal);
+            dst.SetUserTagsInternalErrorsTotal = Interlocked.Read(ref c.SetUserTagsInternalErrorsTotal);            
         }
         return dst;
     }
@@ -150,7 +162,7 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        Interlocked.Increment(ref Counters.LoginInternalErrorsTotal);
                         return;
                     }
                     // read http post body
@@ -163,7 +175,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.ReadRequestErrorsTotal
+                        Interlocked.Increment(ref Counters.LoginInternalErrorsTotal);
                         return;
                     }
                     // 解压缩
@@ -177,7 +190,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.HttpInternalErrorsTotal
+                        Interlocked.Increment(ref Counters.LoginInternalErrorsTotal);
                         return;
                     }                    
                     // 解码
@@ -190,13 +204,16 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
+                        // see: QiWa.KestrelWrap.Counters.HttpProtobufDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpJsonDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpUnknownFormatErrorsTotal
                         Interlocked.Increment(ref Counters.LoginDecodeErrorsTotal);
                         return;
                     }
                     // 调用业务
                     try
                     {
-                        // 加上计时
+                        // todo: 加上计时
                         err = await ctx.Run().ConfigureAwait(true);
                     }
                     catch (Exception ex)
@@ -220,6 +237,7 @@ public class Demo  // 这里是 service 的名字
                         );
                         // 数据上报
                         Interlocked.Increment(ref Counters.LoginLogicErrorsTotal);
+                        context.Response.StatusCode = 500;
                         return;
                     }
                     // 响应
@@ -263,7 +281,7 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        Interlocked.Increment(ref Counters.GetUserInfoInternalErrorsTotal);
                         return;
                     }
                     // read http post body
@@ -276,7 +294,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.ReadRequestErrorsTotal
+                        Interlocked.Increment(ref Counters.GetUserInfoInternalErrorsTotal);
                         return;
                     }
                     // 解压缩
@@ -290,7 +309,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.HttpInternalErrorsTotal
+                        Interlocked.Increment(ref Counters.GetUserInfoInternalErrorsTotal);
                         return;
                     }                    
                     // 解码
@@ -303,13 +323,16 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
+                        // see: QiWa.KestrelWrap.Counters.HttpProtobufDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpJsonDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpUnknownFormatErrorsTotal
                         Interlocked.Increment(ref Counters.GetUserInfoDecodeErrorsTotal);
                         return;
                     }
                     // 调用业务
                     try
                     {
-                        // 加上计时
+                        // todo: 加上计时
                         err = await ctx.Run().ConfigureAwait(true);
                     }
                     catch (Exception ex)
@@ -333,6 +356,7 @@ public class Demo  // 这里是 service 的名字
                         );
                         // 数据上报
                         Interlocked.Increment(ref Counters.GetUserInfoLogicErrorsTotal);
+                        context.Response.StatusCode = 500;
                         return;
                     }
                     // 响应
@@ -376,7 +400,7 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        Interlocked.Increment(ref Counters.SetUserTagsInternalErrorsTotal);
                         return;
                     }
                     // read http post body
@@ -389,7 +413,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.ReadRequestErrorsTotal
+                        Interlocked.Increment(ref Counters.SetUserTagsInternalErrorsTotal);
                         return;
                     }
                     // 解压缩
@@ -403,7 +428,8 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.HttpInternalErrorsTotal
+                        Interlocked.Increment(ref Counters.SetUserTagsInternalErrorsTotal);
                         return;
                     }                    
                     // 解码
@@ -416,13 +442,16 @@ public class Demo  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
+                        // see: QiWa.KestrelWrap.Counters.HttpProtobufDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpJsonDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpUnknownFormatErrorsTotal
                         Interlocked.Increment(ref Counters.SetUserTagsDecodeErrorsTotal);
                         return;
                     }
                     // 调用业务
                     try
                     {
-                        // 加上计时
+                        // todo: 加上计时
                         err = await ctx.Run().ConfigureAwait(true);
                     }
                     catch (Exception ex)
@@ -446,6 +475,7 @@ public class Demo  // 这里是 service 的名字
                         );
                         // 数据上报
                         Interlocked.Increment(ref Counters.SetUserTagsLogicErrorsTotal);
+                        context.Response.StatusCode = 500;
                         return;
                     }
                     // 响应

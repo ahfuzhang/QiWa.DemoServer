@@ -21,6 +21,8 @@ public class {{.ServiceName}}Counters : QiWa.Metrics.MetricsBase, QiWa.Common.IR
     public UInt64 {{.MethodName}}ExceptionsTotal;
     [PrometheusMetric("errors_total", "service=\"{{$root.ServiceName}}\",method=\"{{.MethodName}}\",error_type=\"logic error\"")]
     public UInt64 {{.MethodName}}LogicErrorsTotal;
+    [PrometheusMetric("errors_total", "service=\"{{$root.ServiceName}}\",method=\"{{.MethodName}}\",error_type=\"internal error\"")]
+    public UInt64 {{.MethodName}}InternalErrorsTotal;
 {{- end}}
 
     public void Reset()
@@ -30,6 +32,7 @@ public class {{.ServiceName}}Counters : QiWa.Metrics.MetricsBase, QiWa.Common.IR
         {{.MethodName}}DecodeErrorsTotal = 0;
         {{.MethodName}}ExceptionsTotal = 0;
         {{.MethodName}}LogicErrorsTotal = 0;
+        {{.MethodName}}InternalErrorsTotal = 0;
 {{- end}}
     }
 }
@@ -61,6 +64,7 @@ public class {{.ServiceName}}  // 这里是 service 的名字
             dst.{{.MethodName}}DecodeErrorsTotal = Interlocked.Read(ref c.{{.MethodName}}DecodeErrorsTotal);
             dst.{{.MethodName}}ExceptionsTotal = Interlocked.Read(ref c.{{.MethodName}}ExceptionsTotal);
             dst.{{.MethodName}}LogicErrorsTotal = Interlocked.Read(ref c.{{.MethodName}}LogicErrorsTotal);
+            dst.{{.MethodName}}InternalErrorsTotal = Interlocked.Read(ref c.{{.MethodName}}InternalErrorsTotal);
 {{- end}}            
         }
         return dst;
@@ -121,7 +125,7 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        Interlocked.Increment(ref Counters.{{.MethodName}}InternalErrorsTotal);
                         return;
                     }
                     // read http post body
@@ -134,7 +138,8 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.ReadRequestErrorsTotal
+                        Interlocked.Increment(ref Counters.{{.MethodName}}InternalErrorsTotal);
                         return;
                     }
                     // 解压缩
@@ -148,7 +153,8 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
-                        Interlocked.Increment(ref ContextBase.Counters.InitErrorsTotal);
+                        // see: QiWa.KestrelWrap.Counters.HttpInternalErrorsTotal
+                        Interlocked.Increment(ref Counters.{{.MethodName}}InternalErrorsTotal);
                         return;
                     }                    
                     // 解码
@@ -161,13 +167,16 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                             Field.String("message"u8, err.Message)
                         );
                         // 数据上报
+                        // see: QiWa.KestrelWrap.Counters.HttpProtobufDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpJsonDecodeErrorsTotal
+                        // see: QiWa.KestrelWrap.Counters.HttpUnknownFormatErrorsTotal
                         Interlocked.Increment(ref Counters.{{.MethodName}}DecodeErrorsTotal);
                         return;
                     }
                     // 调用业务
                     try
                     {
-                        // 加上计时
+                        // todo: 加上计时
                         err = await ctx.Run().ConfigureAwait(true);
                     }
                     catch (Exception ex)
@@ -191,6 +200,7 @@ public class {{.ServiceName}}  // 这里是 service 的名字
                         );
                         // 数据上报
                         Interlocked.Increment(ref Counters.{{.MethodName}}LogicErrorsTotal);
+                        context.Response.StatusCode = 500;
                         return;
                     }
                     // 响应

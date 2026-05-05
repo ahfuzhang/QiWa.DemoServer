@@ -12,8 +12,10 @@ using QiWa.Compress;
 /// Export() 由 PeriodicExportingMetricReader 在后台定期调用；HandleMetricsAsync() 由 HTTP 线程读取并压缩输出。
 /// 双 RentedBuffer：_current 用于后台线程拼装，_last 保留上次结果供 HTTP 线程压缩输出。
 /// </summary>
-internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
+public sealed class SnapshotMetricExporter : BaseExporter<Metric>
 {
+    public static SnapshotMetricExporter? Singleton;
+
     // used only in WriteDouble; 'G' format output is pure ASCII so char→byte cast is safe
     private readonly char[] _numBuf = new char[32];
     // double-buffer: _current is written by Export(), _last is read by HTTP thread
@@ -26,6 +28,8 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
     //private readonly string _tagsQueryString;
 
     private Timer? _pushTimer;
+
+    private List<Action> actions = new List<Action>();
 
     private SnapshotMetricExporter(string pushAddr, int exportIntervalMilliseconds)
     {
@@ -42,14 +46,31 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
         //     : string.Empty;
     }
 
-    public static SnapshotMetricExporter Register(WebApplicationBuilder builder, int exportIntervalMilliseconds,
+    /// <summary>
+    /// 构造一个 Metric 对象
+    /// </summary>
+    /// <param name="builder"> kestrel 服务器的 builder </param>
+    /// <param name="exportIntervalMilliseconds">metrics 生成的时间间隔</param>
+    /// <param name="pushAddr">当设置 pushAddr 时，使用 push 模式推送 metrics </param>
+    /// <returns></returns>
+    public static Error Init(WebApplicationBuilder builder, int exportIntervalMilliseconds,
         string pushAddr = "")
     {
-        var exporter = new SnapshotMetricExporter(pushAddr, exportIntervalMilliseconds);
+        if (!string.IsNullOrEmpty(pushAddr) &&
+            (!Uri.TryCreate(pushAddr, UriKind.Absolute, out var uri) ||
+             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)))
+        {
+            return Error.WithLoc(1, $"pushAddr is not a valid http/https URL: '{pushAddr}'");
+        }
+        if (exportIntervalMilliseconds < 10)
+        {
+            exportIntervalMilliseconds = 10;
+        }
+        Singleton = new SnapshotMetricExporter(pushAddr, exportIntervalMilliseconds);
         builder.Services.AddOpenTelemetry()
             .WithMetrics(metrics =>
             {
-                metrics.AddReader(new PeriodicExportingMetricReader(exporter, exportIntervalMilliseconds: exportIntervalMilliseconds));
+                metrics.AddReader(new PeriodicExportingMetricReader(Singleton, exportIntervalMilliseconds: exportIntervalMilliseconds));
                 metrics.AddProcessInstrumentation();
                 metrics.AddRuntimeInstrumentation();
                 metrics.AddHttpClientInstrumentation();
@@ -70,11 +91,22 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
                     "OpenTelemetry.Instrumentation.EventCounters",
                     RuntimeExtraMetrics.MeterName);
             });
-        return exporter;
+        return default;
     }
 
+    /// <summary>
+    /// 处理来自 /metrics 路径的 http 请求
+    /// </summary>
+    /// <param name="context"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task HandleMetricsAsync(HttpContext context)
     {
+        if (_last.Length == 0)
+        {
+            context.Response.StatusCode = 204;  // no content
+            return;
+        }
         var acceptEncoding = context.Request.Headers.AcceptEncoding.ToString();
         bool useZstd = acceptEncoding.Contains("zstd", StringComparison.OrdinalIgnoreCase);
 
@@ -119,11 +151,27 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
         gzipData.Dispose();
     }
 
-    public override ExportResult Export(in Batch<Metric> batch)
+    public void AddCountersGenerator<TServiceCounters>(Func<TServiceCounters, TServiceCounters> f) where TServiceCounters : class, QiWa.Metrics.IMetricFormatter
+    {
+        actions.Add(() =>
+        {
+            TServiceCounters counters = f(null!);
+            counters.ToPrometheusText(ref this._current);
+        });
+    }
+
+    public override ExportResult Export(in Batch<Metric> batch)  //??? 哪里调用了这个函数
     {
         _current.Length = 0;
         foreach (var metric in batch)
+        {
             WriteMetric(metric);
+        }
+        // todo: 在这里写入其他的 metrics
+        foreach (var item in this.actions)
+        {
+            item();
+        }
         _swapLock.EnterWriteLock();
         try
         {
@@ -179,23 +227,23 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
         {
             case MetricType.LongGauge:
                 _current.Append(name); WriteTags(point.Tags);
-                _current.Append(" "); _current.Append(point.GetGaugeLastValueLong()); _current.Append(" "); _current.Append(ts); _current.Append("\n");
+                _current.Append((byte)' '); _current.Append(point.GetGaugeLastValueLong()); _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
                 break;
             case MetricType.DoubleGauge:
                 _current.Append(name); WriteTags(point.Tags);
-                _current.Append(" "); WriteDouble(point.GetGaugeLastValueDouble());
-                _current.Append(" "); _current.Append(ts); _current.Append("\n");
+                _current.Append((byte)' '); WriteDouble(point.GetGaugeLastValueDouble());
+                _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
                 break;
             case MetricType.LongSum:
             case MetricType.LongSumNonMonotonic:
                 _current.Append(name); WriteTags(point.Tags);
-                _current.Append(" "); _current.Append(point.GetSumLong()); _current.Append(" "); _current.Append(ts); _current.Append("\n");
+                _current.Append((byte)' '); _current.Append(point.GetSumLong()); _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
                 break;
             case MetricType.DoubleSum:
             case MetricType.DoubleSumNonMonotonic:
                 _current.Append(name); WriteTags(point.Tags);
-                _current.Append(" "); WriteDouble(point.GetSumDouble());
-                _current.Append(" "); _current.Append(ts); _current.Append("\n");
+                _current.Append((byte)' '); WriteDouble(point.GetSumDouble());
+                _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
                 break;
             case MetricType.Histogram:
                 WriteHistogram(name, point.Tags, in point, ts);
@@ -209,72 +257,72 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
 
     private void WriteHistogram(string name, ReadOnlyTagCollection tags, in MetricPoint point, long ts)
     {
-        _current.Append(name); _current.Append("_count"); WriteTags(tags);
-        _current.Append(" "); _current.Append(point.GetHistogramCount()); _current.Append(" "); _current.Append(ts); _current.Append("\n");
+        _current.Append(name); _current.Append("_count"u8); WriteTags(tags);
+        _current.Append((byte)' '); _current.Append(point.GetHistogramCount()); _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
 
-        _current.Append(name); _current.Append("_sum"); WriteTags(tags);
-        _current.Append(" "); WriteDouble(point.GetHistogramSum());
-        _current.Append(" "); _current.Append(ts); _current.Append("\n");
+        _current.Append(name); _current.Append("_sum"u8); WriteTags(tags);
+        _current.Append((byte)' '); WriteDouble(point.GetHistogramSum());
+        _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
 
         long cumCount = 0;
         foreach (var bucket in point.GetHistogramBuckets())
         {
             cumCount += bucket.BucketCount;
-            _current.Append(name); _current.Append("_bucket");
+            _current.Append(name); _current.Append("_bucket"u8);
             WriteTagsWithLe(tags, bucket.ExplicitBound);
-            _current.Append(" "); _current.Append(cumCount); _current.Append(" "); _current.Append(ts); _current.Append("\n");
+            _current.Append((byte)' '); _current.Append(cumCount); _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
         }
     }
 
     private void WriteExponentialHistogram(string name, ReadOnlyTagCollection tags, in MetricPoint point, long ts)
     {
-        _current.Append(name); _current.Append("_count"); WriteTags(tags);
-        _current.Append(" "); _current.Append(point.GetHistogramCount()); _current.Append(" "); _current.Append(ts); _current.Append("\n");
+        _current.Append(name); _current.Append("_count"u8); WriteTags(tags);
+        _current.Append((byte)' '); _current.Append(point.GetHistogramCount()); _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
 
-        _current.Append(name); _current.Append("_sum"); WriteTags(tags);
-        _current.Append(" "); WriteDouble(point.GetHistogramSum());
-        _current.Append(" "); _current.Append(ts); _current.Append("\n");
+        _current.Append(name); _current.Append("_sum"u8); WriteTags(tags);
+        _current.Append((byte)' '); WriteDouble(point.GetHistogramSum());
+        _current.Append((byte)' '); _current.Append(ts); _current.Append((byte)'\n');
     }
 
     // 直接写入 _current，避免构建中间 string；label key 中的 '.' 替换为 '_' 以符合 Prometheus 格式
     private void WriteTags(ReadOnlyTagCollection tags)
     {
         if (tags.Count == 0) return;
-        _current.Append("{");
+        _current.Append((byte)'{');
         bool first = true;
         foreach (var kv in tags)
         {
-            if (!first) _current.Append(",");
+            if (!first) _current.Append((byte)',');
             _current.Append(kv.Key.Replace('.', '_').Replace('-', '_'));
-            _current.Append("=\"");
+            _current.Append("=\""u8);
             _current.Append(kv.Value?.ToString() ?? "");
-            _current.Append("\"");
+            _current.Append((byte)'"');
             first = false;
         }
-        _current.Append("}");
+        _current.Append((byte)'}');
     }
 
     // 写带 le 标签的 tag set（用于 histogram bucket）
     private void WriteTagsWithLe(ReadOnlyTagCollection tags, double explicitBound)
     {
-        _current.Append("{");
+        _current.Append((byte)'{');
         bool first = true;
         foreach (var kv in tags)
         {
-            if (!first) _current.Append(",");
+            if (!first) _current.Append((byte)',');
             _current.Append(kv.Key.Replace('.', '_').Replace('-', '_'));
-            _current.Append("=\"");
+            _current.Append("=\""u8);
             _current.Append(kv.Value?.ToString() ?? "");
-            _current.Append("\"");
+            _current.Append((byte)'"');
             first = false;
         }
-        if (!first) _current.Append(",");
-        _current.Append("le=\"");
+        if (!first) _current.Append((byte)',');
+        _current.Append("le=\""u8);
         if (double.IsPositiveInfinity(explicitBound))
-            _current.Append("+Inf");
+            _current.Append("+Inf"u8);
         else
             WriteDouble(explicitBound);
-        _current.Append("\"}");
+        _current.Append((byte)'}');
     }
 
     // TryFormat 写入栈上 char[]，使用 InvariantCulture 确保小数点为 '.'，符合 Prometheus 文本格式；
@@ -301,9 +349,8 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
 
     private void PushToRemote(object? state)
     {
-        //_ = Task.Run(()=>{
-        var buf = new RentedBuffer(_last.Length);
         _swapLock.EnterReadLock();
+        var buf = new RentedBuffer(_last.Length);
         try
         {
             ZstdCompressor.Compress(ref buf, _last.AsSpan());
@@ -339,7 +386,6 @@ internal sealed class SnapshotMetricExporter : BaseExporter<Metric>
                 Field.Int64("status_code"u8, statusCode)
             );
         });
-        //});
     }
 
     protected override void Dispose(bool disposing)
